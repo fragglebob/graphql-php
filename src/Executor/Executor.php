@@ -43,9 +43,9 @@ use GraphQL\Utils;
  */
 class Executor
 {
-    private static $UNDEFINED;
+    protected static $UNDEFINED;
 
-    private static $defaultResolveFn = [__CLASS__, 'defaultResolveFn'];
+    protected static $defaultResolveFn = [__CLASS__, 'defaultResolveFn'];
 
     /**
      * Custom default resolve function
@@ -103,7 +103,7 @@ class Executor
      * Constructs a ExecutionContext object from the arguments passed to
      * execute, which we will pass throughout the other execution methods.
      */
-    private static function buildExecutionContext(
+    protected static function buildExecutionContext(
         Schema $schema,
         Document $documentAst,
         $rootValue,
@@ -161,7 +161,7 @@ class Executor
     /**
      * Implements the "Evaluating operations" section of the spec.
      */
-    private static function executeOperation(ExecutionContext $exeContext, OperationDefinition $operation, $rootValue)
+    protected static function executeOperation(ExecutionContext $exeContext, OperationDefinition $operation, $rootValue)
     {
         $type = self::getOperationRootType($exeContext->schema, $operation);
         $fields = self::collectFields($exeContext, $type, $operation->selectionSet, new \ArrayObject(), new \ArrayObject());
@@ -182,7 +182,7 @@ class Executor
      * @return ObjectType
      * @throws Error
      */
-    private static function getOperationRootType(Schema $schema, OperationDefinition $operation)
+    protected static function getOperationRootType(Schema $schema, OperationDefinition $operation)
     {
         switch ($operation->operation) {
             case 'query':
@@ -217,7 +217,7 @@ class Executor
      * Implements the "Evaluating selection sets" section of the spec
      * for "write" mode.
      */
-    private static function executeFieldsSerially(ExecutionContext $exeContext, ObjectType $parentType, $sourceValue, $fields)
+    protected static function executeFieldsSerially(ExecutionContext $exeContext, ObjectType $parentType, $sourceValue, $fields)
     {
         $results = [];
         foreach ($fields as $responseName => $fieldASTs) {
@@ -235,7 +235,7 @@ class Executor
      * Implements the "Evaluating selection sets" section of the spec
      * for "read" mode.
      */
-    private static function executeFields(ExecutionContext $exeContext, ObjectType $parentType, $source, $fields)
+    protected static function executeFields(ExecutionContext $exeContext, ObjectType $parentType, $source, $fields)
     {
         // Native PHP doesn't support promises.
         // Custom executor should be built for platforms like ReactPHP
@@ -253,7 +253,7 @@ class Executor
      *
      * @return \ArrayObject
      */
-    private static function collectFields(
+    protected static function collectFields(
         ExecutionContext $exeContext,
         ObjectType $runtimeType,
         SelectionSet $selectionSet,
@@ -316,7 +316,7 @@ class Executor
      * Determines if a field should be included based on the @include and @skip
      * directives, where @skip has higher precedence than @include.
      */
-    private static function shouldIncludeNode(ExecutionContext $exeContext, $directives)
+    protected static function shouldIncludeNode(ExecutionContext $exeContext, $directives)
     {
         $skipDirective = Directive::skipDirective();
         $includeDirective = Directive::includeDirective();
@@ -355,7 +355,7 @@ class Executor
     /**
      * Determines if a fragment is applicable to the given type.
      */
-    private static function doesFragmentConditionMatch(ExecutionContext $exeContext,/* FragmentDefinition | InlineFragment*/ $fragment, ObjectType $type)
+    protected static function doesFragmentConditionMatch(ExecutionContext $exeContext,/* FragmentDefinition | InlineFragment*/ $fragment, ObjectType $type)
     {
         $typeConditionAST = $fragment->typeCondition;
 
@@ -376,7 +376,7 @@ class Executor
     /**
      * Implements the logic to compute the key of a given fields entry
      */
-    private static function getFieldEntryKey(Field $node)
+    protected static function getFieldEntryKey(Field $node)
     {
         return $node->alias ? $node->alias->value : $node->name->value;
     }
@@ -387,7 +387,7 @@ class Executor
      * then calls completeValue to complete promises, serialize scalars, or execute
      * the sub-selection-set for objects.
      */
-    private static function resolveField(ExecutionContext $exeContext, ObjectType $parentType, $source, $fieldASTs)
+    protected static function resolveField(ExecutionContext $exeContext, ObjectType $parentType, $source, $fieldASTs)
     {
         $fieldAST = $fieldASTs[0];
 
@@ -454,7 +454,7 @@ class Executor
 
     // Isolates the "ReturnOrAbrupt" behavior to not de-opt the `resolveField`
     // function. Returns the result of resolveFn or the abrupt-return Error object.
-    private static function resolveOrError($resolveFn, $source, $args, $context, $info)
+    protected static function resolveOrError($resolveFn, $source, $args, $context, $info)
     {
         try {
             return call_user_func($resolveFn, $source, $args, $context, $info);
@@ -521,7 +521,7 @@ class Executor
      * @throws Error
      * @throws \Exception
      */
-    private static function completeValue(ExecutionContext $exeContext, Type $returnType, $fieldASTs, ResolveInfo $info, &$result)
+    protected static function completeValue(ExecutionContext $exeContext, Type $returnType, $fieldASTs, ResolveInfo $info, &$result)
     {
         if ($result instanceof \Exception) {
             throw Error::createLocatedError($result, $fieldASTs);
@@ -611,7 +611,7 @@ class Executor
      *
      * @return FieldDefinition
      */
-    private static function getFieldDef(Schema $schema, ObjectType $parentType, $fieldName)
+    protected static function getFieldDef(Schema $schema, ObjectType $parentType, $fieldName)
     {
         $schemaMetaFieldDef = Introspection::schemaMetaFieldDef();
         $typeMetaFieldDef = Introspection::typeMetaFieldDef();
@@ -635,7 +635,7 @@ class Executor
      * @param  object $fieldAST
      * @return string
      */
-    private static function getFieldUid($fieldAST, ObjectType $fieldType)
+    protected static function getFieldUid($fieldAST, ObjectType $fieldType)
     {
         return $fieldAST->loc->start . '-' . $fieldAST->loc->end . '-' . $fieldType->name;
     }
@@ -652,7 +652,7 @@ class Executor
      * @return mixed
      * @throws Error
      */
-    private static function completeAbstractValue(ExecutionContext $exeContext, AbstractType $returnType, $fieldASTs, ResolveInfo $info, &$result)
+    protected static function completeAbstractValue(ExecutionContext $exeContext, AbstractType $returnType, $fieldASTs, ResolveInfo $info, &$result)
     {
         $resolveType = $returnType->getResolveTypeFn();
 
@@ -690,7 +690,7 @@ class Executor
      * @return array
      * @throws \Exception
      */
-    private static function completeListValue(ExecutionContext $exeContext, ListOfType $returnType, $fieldASTs, ResolveInfo $info, &$result)
+    protected static function completeListValue(ExecutionContext $exeContext, ListOfType $returnType, $fieldASTs, ResolveInfo $info, &$result)
     {
         $itemType = $returnType->getWrappedType();
         Utils::invariant(
@@ -714,7 +714,7 @@ class Executor
      * @return mixed
      * @throws \Exception
      */
-    private static function completeLeafValue(Type $returnType, &$result)
+    protected static function completeLeafValue(Type $returnType, &$result)
     {
         Utils::invariant(method_exists($returnType, 'serialize'), 'Missing serialize method on type');
         return $returnType->serialize($result);
@@ -731,7 +731,7 @@ class Executor
      * @return array
      * @throws Error
      */
-    private static function completeObjectValue(ExecutionContext $exeContext, ObjectType $returnType, $fieldASTs, ResolveInfo $info, &$result)
+    protected static function completeObjectValue(ExecutionContext $exeContext, ObjectType $returnType, $fieldASTs, ResolveInfo $info, &$result)
     {
         // If there is an isTypeOf predicate function, call it with the
         // current result. If isTypeOf returns false, then raise an error rather
