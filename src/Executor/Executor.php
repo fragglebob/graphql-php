@@ -56,7 +56,7 @@ class Executor
     public static function setDefaultResolveFn($fn)
     {
         Utils::invariant(is_callable($fn), 'Expecting callable, but got ' . Utils::getVariableType($fn));
-        self::$defaultResolveFn = $fn;
+        static::$defaultResolveFn = $fn;
     }
 
     /**
@@ -70,8 +70,8 @@ class Executor
      */
     public static function execute(Schema $schema, Document $ast, $rootValue = null, $contextValue = null, $variableValues = null, $operationName = null)
     {
-        if (!self::$UNDEFINED) {
-            self::$UNDEFINED = new \stdClass();
+        if (!static::$UNDEFINED) {
+            static::$UNDEFINED = new \stdClass();
         }
 
         if (null !== $variableValues) {
@@ -87,10 +87,10 @@ class Executor
             );
         }
 
-        $exeContext = self::buildExecutionContext($schema, $ast, $rootValue, $contextValue, $variableValues, $operationName);
+        $exeContext = static::buildExecutionContext($schema, $ast, $rootValue, $contextValue, $variableValues, $operationName);
 
         try {
-            $data = self::executeOperation($exeContext, $exeContext->operation, $rootValue);
+            $data = static::executeOperation($exeContext, $exeContext->operation, $rootValue);
         } catch (Error $e) {
             $exeContext->addError($e);
             $data = null;
@@ -163,14 +163,14 @@ class Executor
      */
     protected static function executeOperation(ExecutionContext $exeContext, OperationDefinition $operation, $rootValue)
     {
-        $type = self::getOperationRootType($exeContext->schema, $operation);
-        $fields = self::collectFields($exeContext, $type, $operation->selectionSet, new \ArrayObject(), new \ArrayObject());
+        $type = static::getOperationRootType($exeContext->schema, $operation);
+        $fields = static::collectFields($exeContext, $type, $operation->selectionSet, new \ArrayObject(), new \ArrayObject());
 
         if ($operation->operation === 'mutation') {
-            return self::executeFieldsSerially($exeContext, $type, $rootValue, $fields);
+            return static::executeFieldsSerially($exeContext, $type, $rootValue, $fields);
         }
 
-        return self::executeFields($exeContext, $type, $rootValue, $fields);
+        return static::executeFields($exeContext, $type, $rootValue, $fields);
     }
 
 
@@ -221,9 +221,9 @@ class Executor
     {
         $results = [];
         foreach ($fields as $responseName => $fieldASTs) {
-            $result = self::resolveField($exeContext, $parentType, $sourceValue, $fieldASTs);
+            $result = static::resolveField($exeContext, $parentType, $sourceValue, $fieldASTs);
 
-            if ($result !== self::$UNDEFINED) {
+            if ($result !== static::$UNDEFINED) {
                 // Undefined means that field is not defined in schema
                 $results[$responseName] = $result;
             }
@@ -239,7 +239,7 @@ class Executor
     {
         // Native PHP doesn't support promises.
         // Custom executor should be built for platforms like ReactPHP
-        return self::executeFieldsSerially($exeContext, $parentType, $source, $fields);
+        return static::executeFieldsSerially($exeContext, $parentType, $source, $fields);
     }
 
 
@@ -264,22 +264,22 @@ class Executor
         foreach ($selectionSet->selections as $selection) {
             switch ($selection->kind) {
                 case Node::FIELD:
-                    if (!self::shouldIncludeNode($exeContext, $selection->directives)) {
+                    if (!static::shouldIncludeNode($exeContext, $selection->directives)) {
                         continue;
                     }
-                    $name = self::getFieldEntryKey($selection);
+                    $name = static::getFieldEntryKey($selection);
                     if (!isset($fields[$name])) {
                         $fields[$name] = new \ArrayObject();
                     }
                     $fields[$name][] = $selection;
                     break;
                 case Node::INLINE_FRAGMENT:
-                    if (!self::shouldIncludeNode($exeContext, $selection->directives) ||
-                        !self::doesFragmentConditionMatch($exeContext, $selection, $runtimeType)
+                    if (!static::shouldIncludeNode($exeContext, $selection->directives) ||
+                        !static::doesFragmentConditionMatch($exeContext, $selection, $runtimeType)
                     ) {
                         continue;
                     }
-                    self::collectFields(
+                    static::collectFields(
                         $exeContext,
                         $runtimeType,
                         $selection->selectionSet,
@@ -289,17 +289,17 @@ class Executor
                     break;
                 case Node::FRAGMENT_SPREAD:
                     $fragName = $selection->name->value;
-                    if (!empty($visitedFragmentNames[$fragName]) || !self::shouldIncludeNode($exeContext, $selection->directives)) {
+                    if (!empty($visitedFragmentNames[$fragName]) || !static::shouldIncludeNode($exeContext, $selection->directives)) {
                         continue;
                     }
                     $visitedFragmentNames[$fragName] = true;
 
                     /** @var FragmentDefinition|null $fragment */
                     $fragment = isset($exeContext->fragments[$fragName]) ? $exeContext->fragments[$fragName] : null;
-                    if (!$fragment || !self::doesFragmentConditionMatch($exeContext, $fragment, $runtimeType)) {
+                    if (!$fragment || !static::doesFragmentConditionMatch($exeContext, $fragment, $runtimeType)) {
                         continue;
                     }
-                    self::collectFields(
+                    static::collectFields(
                         $exeContext,
                         $runtimeType,
                         $fragment->selectionSet,
@@ -393,10 +393,10 @@ class Executor
 
         $fieldName = $fieldAST->name->value;
 
-        $fieldDef = self::getFieldDef($exeContext->schema, $parentType, $fieldName);
+        $fieldDef = static::getFieldDef($exeContext->schema, $parentType, $fieldName);
 
         if (!$fieldDef) {
-            return self::$UNDEFINED;
+            return static::$UNDEFINED;
         }
 
         $returnType = $fieldDef->getType();
@@ -429,7 +429,7 @@ class Executor
         } else if (isset($parentType->resolveFieldFn)) {
             $resolveFn = $parentType->resolveFieldFn;
         } else {
-            $resolveFn = self::$defaultResolveFn;
+            $resolveFn = static::$defaultResolveFn;
         }
 
         // The resolve function's optional third argument is a context value that
@@ -439,9 +439,9 @@ class Executor
 
         // Get the resolve function, regardless of if its result is normal
         // or abrupt (error).
-        $result = self::resolveOrError($resolveFn, $source, $args, $context, $info);
+        $result = static::resolveOrError($resolveFn, $source, $args, $context, $info);
 
-        $result = self::completeValueCatchingError(
+        $result = static::completeValueCatchingError(
             $exeContext,
             $returnType,
             $fieldASTs,
@@ -476,13 +476,13 @@ class Executor
         // If the field type is non-nullable, then it is resolved without any
         // protection from errors.
         if ($returnType instanceof NonNull) {
-            return self::completeValue($exeContext, $returnType, $fieldASTs, $info, $result);
+            return static::completeValue($exeContext, $returnType, $fieldASTs, $info, $result);
         }
 
         // Otherwise, error protection is applied, logging the error and resolving
         // a null value for this field if one is encountered.
         try {
-            return self::completeValue($exeContext, $returnType, $fieldASTs, $info, $result);
+            return static::completeValue($exeContext, $returnType, $fieldASTs, $info, $result);
         } catch (Error $err) {
             // If `completeValue` returned abruptly (threw an error), log the error
             // and return null.
@@ -530,7 +530,7 @@ class Executor
         // If field type is NonNull, complete for inner type, and throw field error
         // if result is null.
         if ($returnType instanceof NonNull) {
-            $completed = self::completeValue(
+            $completed = static::completeValue(
                 $exeContext,
                 $returnType->getWrappedType(),
                 $fieldASTs,
@@ -553,23 +553,23 @@ class Executor
 
         // If field type is List, complete each item in the list with the inner type
         if ($returnType instanceof ListOfType) {
-            return self::completeListValue($exeContext, $returnType, $fieldASTs, $info, $result);
+            return static::completeListValue($exeContext, $returnType, $fieldASTs, $info, $result);
         }
 
         // If field type is Scalar or Enum, serialize to a valid value, returning
         // null if serialization is not possible.
         if ($returnType instanceof ScalarType ||
             $returnType instanceof EnumType) {
-            return self::completeLeafValue($returnType, $result);
+            return static::completeLeafValue($returnType, $result);
         }
 
         if ($returnType instanceof AbstractType) {
-            return self::completeAbstractValue($exeContext, $returnType, $fieldASTs, $info, $result);
+            return static::completeAbstractValue($exeContext, $returnType, $fieldASTs, $info, $result);
         }
 
         // Field type must be Object, Interface or Union and expect sub-selections.
         if ($returnType instanceof ObjectType) {
-            return self::completeObjectValue($exeContext, $returnType, $fieldASTs, $info, $result);
+            return static::completeObjectValue($exeContext, $returnType, $fieldASTs, $info, $result);
         }
 
         throw new Error("Cannot complete value of unexpected type \"{$returnType}\".");
@@ -675,7 +675,7 @@ class Executor
                 $fieldASTs
             );
         }
-        return self::completeObjectValue($exeContext, $runtimeType, $fieldASTs, $info, $result);
+        return static::completeObjectValue($exeContext, $runtimeType, $fieldASTs, $info, $result);
     }
 
     /**
@@ -700,7 +700,7 @@ class Executor
 
         $tmp = [];
         foreach ($result as $item) {
-            $tmp[] = self::completeValueCatchingError($exeContext, $itemType, $fieldASTs, $info, $item);
+            $tmp[] = static::completeValueCatchingError($exeContext, $itemType, $fieldASTs, $info, $item);
         }
         return $tmp;
     }
@@ -750,13 +750,13 @@ class Executor
         $fieldsCount = count($fieldASTs);
         for ($i = 0; $i < $fieldsCount; $i++) {
             // Get memoized value if it exists
-            $uid = self::getFieldUid($fieldASTs[$i], $returnType);
+            $uid = static::getFieldUid($fieldASTs[$i], $returnType);
             if (isset($exeContext->memoized['collectSubFields'][$uid])) {
                 $subFieldASTs = $exeContext->memoized['collectSubFields'][$uid];
             } else {
                 $selectionSet = $fieldASTs[$i]->selectionSet;
                 if ($selectionSet) {
-                    $subFieldASTs = self::collectFields(
+                    $subFieldASTs = static::collectFields(
                         $exeContext,
                         $returnType,
                         $selectionSet,
@@ -768,6 +768,6 @@ class Executor
             }
         }
 
-        return self::executeFields($exeContext, $returnType, $result, $subFieldASTs);
+        return static::executeFields($exeContext, $returnType, $result, $subFieldASTs);
     }
 }
